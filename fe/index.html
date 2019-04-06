@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>抢购设定</title>
+        <script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+        <link rel="stylesheet" href="./index.css">
+    </head>
+    <body>
+        <div class="">
+            <span id="id-getGoods">重新获取商品</span>
+            <div class="div-goods-container"></div>
+            <span class="tips">点击图片自动填充</span>
+            <label>
+                gid：<input id="id-gid" type="text" value="" placeholder="gid (商品编号)">
+                atid：<input id="id-atid" type="text" value="" placeholder="atid (活动编号)">
+            </label>
+            <label>整点抢购的时间：
+                <input id="id-deadline" type="text" value="" placeholder="格式: 2019-02-15 18:00:00">
+            </label>
+            <label>每秒抢购的次数：
+                <input id="id-frequency" type="number" value="120" placeholder="最多200,默认100" min="10" max="1000" step="10">（每秒最多1000次，最少10次）
+            </label>
+            <label>提前几秒开始抢：
+                <input id="id-speedinessTime" type="number" value="4" placeholder="最多6秒，默认4秒" min="2" max="6" step="1">（提前最多6秒，最少2秒）
+            </label>
+            <label>商品名称：
+                <span id="id-title"></span>
+            </label>
+            <span class="popup-btn disabled">开始</span>
+            <p class="p-error"></p>
+        </div>
+        <div class="">
+            <p class="p-time"></p>
+        </div>
+        <script src="./index.js"></script>
+    </body>
+</html>

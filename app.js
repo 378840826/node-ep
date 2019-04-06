@@ -32,6 +32,7 @@ const sendHtml = function(path, response) {
 let openFeServer = () => {
     const app = express()
     app.use(bodyParser.json())
+    app.use(bodyParser.urlencoded({ extended: false }))
     app.use(express.static(path.join(__dirname, 'fe')))
     //主页
     app.get('/', (request, response) => {
@@ -52,6 +53,7 @@ let openFeServer = () => {
     })
     // 加购物车
     app.post('/addToCart', (request, response) => {
+        addToCart(request.body)
         response.send('收到加购请求')
     })
     // 开启监听
@@ -220,8 +222,52 @@ const getGoods = () => {
     return promise
 }
 
-const addToCart = () => {
+// 加购物车（被循环调用）
+const addGoodsTocart = function (goodsInfo, url) {
+    let opts = {
+        gid: goodsInfo.gid,
+        buytype: 'berserk',
+        pam: goodsInfo.atid,
+        pam1: `${goodsInfo.gid}|1`,
+        show_cart: false,
+        action: 'updatecart',
+        inajax: '1',
+        buynum: 1,
+        tp: 'add',
+        succeed_box: 1,
+        hash: Math.random()
+    }
+    let request = ajax.get({url, qs: opts, json: true}, function(error, response, body) {
+        console.log('body is', body);
+    })
 
+    return
+    $.get(url, opts, function (res) {
+        if (res.includes('已抢完')) {
+            console.log('%c 商品已抢完，停止抢购~~~~~~~~~~','color:#666');
+            // 延迟关闭请求
+            setTimeout(function() {
+                window.clearInterval(berserkTimer)
+            }, 100)
+        } else if (res.includes('抢购上限')) {
+            console.log('%c 抢到了，15分钟内去付款！','background:#ccc;color:#f00;font-size:20px;');
+            // 延迟关闭请求, 并跳转至购物车
+            setTimeout(function() {
+                window.clearInterval(berserkTimer)
+            }, 100)
+        } else {
+            console.log(res);
+        }
+    })
+}
+
+// 开始循环加入购物车
+const addToCart = function (goodsInfo) {
+    let loopTime = parseInt(1000 / goodsInfo.frequency)
+    var url = 'https://www.epet.com/share/ajax.html'
+    berserkTimer =  setInterval(function () {
+        addGoodsTocart(goodsInfo, url)
+    }, loopTime)
 }
 
 const __main = () => {

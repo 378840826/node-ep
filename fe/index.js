@@ -176,7 +176,7 @@ const bindClickStart = () => {
 // 请求加入购物车
 const addToCart = (goods) => {
     console.log('加购物车', goods);
-    $.post('/addToCart', function(res) {
+    $.post('/addToCart', goods, function(res) {
         document.querySelector('.p-time').innerText = '开始抢'
     })
 }

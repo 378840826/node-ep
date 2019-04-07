@@ -133,8 +133,8 @@ const bindClickStart = () => {
             atid: Number(atid),
             deadline: deadline,
             title: title,
-            frequency: frequency,
-            speedinessTime: speedinessTime,
+            frequency: Number(frequency),
+            speedinessTime: Number(speedinessTime),
         }
         // 发送请求给 node，获取服务器时间
         $.get('/getServiceTime', goods, (res, textStatus, jqXHR) => {
@@ -154,8 +154,10 @@ const bindClickStart = () => {
                 // 每秒钟 剩余时间 -1
                 time_s = time_s - 1
                 // 如果快到时间了
-                if (time_s <= 3) {
+                if (time_s <= speedinessTime) {
                     addToCart(goods)
+                    // 等抢购结束，查询抢购结果
+                    getResult(speedinessTime)
                     // 停止计时
                     clearInterval(timer)
                 } else {
@@ -164,7 +166,7 @@ const bindClickStart = () => {
                     let nowTime = new Date(nowTimestamp)
                     let text = `剩余${parseInt(time_s / 60)}分${parseInt(time_s % 60)}秒   &&  服务器时间为${timeFormat(nowTime, 'HMS')}`
                     console.log(text)
-                    let timeContainer = document.querySelector('.p-time')
+                    let timeContainer = document.querySelector('.p-log')
                     timeContainer.innerText = text
                 }
             }, 1000)
@@ -173,11 +175,25 @@ const bindClickStart = () => {
     })
 }
 
+// 查询抢购结果
+const getResult = (speedinessTime) => {
+    let time = (Number(speedinessTime) + 2) * 1000
+    setTimeout(() => {
+        console.log('查询结果');
+        $.get('/getResult', (res) => {
+            let timeContainer = document.querySelector('.p-log')
+            timeContainer.innerText = res
+            // 启用抢购按钮
+            $('.popup-btn.disabled').removeClass('disabled')
+        })
+    }, time)
+}
+
 // 请求加入购物车
 const addToCart = (goods) => {
     console.log('加购物车', goods);
     $.post('/addToCart', goods, function(res) {
-        document.querySelector('.p-time').innerText = '开始抢'
+        document.querySelector('.p-log').innerText = '开始抢'
     })
 }
 

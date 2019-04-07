@@ -15,6 +15,11 @@
     margin: 10px;
 }
 
+.div-log {
+    height: 200px;
+    overflow: auto;
+}
+
 .popup-btn {
     display: inline-block;
     padding: 6px 12px;

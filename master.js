@@ -1,36 +1,28 @@
-/*
-1，获取服务器时间
-2，获取商品信息
+/**
 */
 
 
-
-const arguments = process.argv.splice(2)
+const fs = require('fs')
+const childProcess = require('child_process')
 const express = require('express')
 const path = require('path')
 const ajax = require('request')
-// 解析网页数据(转为 dom 树) 语法类似 jquery
 const cheerio = require('cheerio')
 const bodyParser = require('body-parser')
 
 
 
 const sendHtml = function(path, response) {
-    //引入 fs 模块
-    let fs = require('fs')
-    //options 对象包含编码格式，用于 fs 读取文件
     let options = {
         encoding:'utf-8'
     }
-    //fs.readFile 读取文件，1、路径，2、编码，3、回调(1、错误，2、内容)
     fs.readFile(path, options, function(err, data){
-        //console.log(`读取的html文件 ${path} 内容是`, data)
         response.send(data)
     })
 }
 
 // 前端服务
-let openFeServer = () => {
+const openFeServer = () => {
     const app = express()
     app.use(bodyParser.json())
     app.use(bodyParser.urlencoded({ extended: false }))
@@ -63,15 +55,28 @@ let openFeServer = () => {
     app.get('/getResult', (request, response) => {
         let res = '抢了' + buyingNum.get() + '次；' + buyingResult.get()
         response.send(res)
-        // 获取结果了，说明超过抢购时间了，停止抢购
-        clearInterval(berserkTimer)
+    })
+    // 接收子进程的抢购结果信息
+    app.post('/sendResult', (request, response) => {
+        let res = request.body
+        console.log('子进程传来的结果', res);
+        if (res.result.includes('抢到了')) {
+            buyingResult.set('抢到了，15分钟内去付款！！！')
+        }
+        buyingNum.add(res.num)
+        response.send('收到结果信息')
+    })
+    // 接收子进程的 log 信息
+    app.post('/log', (request, response) => {
+        let res = request.body
+        console.log('子进程的log：', res);
+        response.send('收到结果信息')
     })
     // 开启监听
-    let port = arguments[0]
-    let server = app.listen(arguments[0], function() {
+    let server = app.listen(80, function() {
         let host = server.address().address
         let port = server.address().port
-        console.log(`请在浏览器地址栏输入 127.0.0.1:${port} 打开,如果运行的是 node master ，忽略这条`)
+        console.log(`==================请在浏览器地址栏输入 127.0.0.1 打开=================`)
     })
 }
 
@@ -218,7 +223,11 @@ let buyingResult = {
 let buyingNum = {
     add: (() => {
         this.sum = 0
-        return () => {
+        return (n) => {
+            if (n) {
+                this.sum += Number(n)
+                return this.sum
+            }
             return ++this.sum
         }
     })(),
@@ -230,8 +239,8 @@ let buyingNum = {
     }
 }
 
-// 加购物车（被循环调用）
-const addGoodsTocart = function (goodsInfo, url) {
+// 通知子进程抢购
+const addToCart = function (goodsInfo) {
     let qs = {
         gid: goodsInfo.gid,
         buytype: 'berserk',
@@ -245,59 +254,54 @@ const addGoodsTocart = function (goodsInfo, url) {
         succeed_box: 1,
         hash: Math.random()
     }
-    let options = {
-        url,
+    let body = {
+        url: 'https://www.epet.com/share/ajax.html',
         qs: qs,
         json: true,
         headers: {
             'cookie': `X15t_PETTYPE_SWITCH_TIP=1; X15t_mycityid=32860; X15t_ssid=4OOp8IJ6BBl0BbiZ; _ga=GA1.2.520273905.1548986198; X15t_mall_uid=4400883; sensorsdata2015jssdkcross=%7B%22distinct_id%22%3A%22168a6c5a42e71e-0232bc5b2e9-5e1d3712-2073600-168a6c5a42f6d7%22%2C%22%24device_id%22%3A%22168a6c5a42e71e-0232bc5b2e9-5e1d3712-2073600-168a6c5a42f6d7%22%2C%22props%22%3A%7B%22%24latest_traffic_source_type%22%3A%22%E7%9B%B4%E6%8E%A5%E6%B5%81%E9%87%8F%22%2C%22%24latest_referrer%22%3A%22%22%2C%22%24latest_referrer_host%22%3A%22%22%2C%22%24latest_search_keyword%22%3A%22%E6%9C%AA%E5%8F%96%E5%88%B0%E5%80%BC_%E7%9B%B4%E6%8E%A5%E6%89%93%E5%BC%80%22%7D%7D; X15t_mywid=1; X15t_location_place=20_37916_37925; X15t_gott_auth=eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE1NTMzMTcxMTYsInVzZXIiOnsidWlkIjo0NDAwODgzLCJhY0lkIjozNDY5NDQ0NjUyODMzMzgyNCwibmFtZSI6IuS4u-S6ul9JT2k3N0Y3SlduIn0sImlhdCI6MTU1MzMxMzUxNn0.8-L4OH3-upWg4E1GkL-hj9bvFt5Xun1GwoICM4v_TkQ; X15t_gott_auth_refresh=eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE1NTU5MDU1MTYsInVzZXIiOnsidWlkIjo0NDAwODgzLCJhY0lkIjozNDY5NDQ0NjUyODMzMzgyNCwibmFtZSI6IuS4u-S6ul9JT2k3N0Y3SlduIn0sImlhdCI6MTU1MzMxMzUxNn0.aKME0Qef1hPEygqLA0hBsbUqQcJmIWTs0ssRBQoPlAg; acw_tc=b73c9f2015543688861992683e0f33fe2809ad6ea6987c6de729a00d9d; X15t_appcode_4400883=1; X15t_views_his=110711%2C172420%2C259113%2C172424; _gid=GA1.2.887393918.1554687877; X15t_cart_num=0; X15t_PET_TYPE=cat; Hm_lvt_46b764c8f191469d8f1df15610466406=1554515952,1554687877,1554773464,1554861601; Hm_lvt_8dcd0895e4efc2d51b880622aa21832f=1554515952,1554687877,1554773465,1554861601; PHPSESSID=dh0dmc8iidmd29fo6agc7vfhpf; Hm_lpvt_8dcd0895e4efc2d51b880622aa21832f=1554861645; Hm_lpvt_46b764c8f191469d8f1df15610466406=1554861645`,
         },
     }
-    buyingNum.add()
-    let request = ajax.get(options, function(error, response, body) {
-        body = body || ''
-        if (body.includes('已抢完')) {
-            // 延迟关闭请求
-            setTimeout(function() {
-                clearInterval(berserkTimer)
-            }, 50)
-        } else if (body.includes('抢购上限')) {
-            buyingResult.set('抢到了，15分钟内去付款！')
-            // 延迟关闭请求, 并跳转至购物车
-            setTimeout(function() {
-                clearInterval(berserkTimer)
-            }, 50)
+    // 通知子进程抢购
+    for (let i = 0; i < workers.length; i++) {
+        let worker = workers[i]
+        let port = worker.spawnargs[2]
+        let options = {
+            url: `http://127.0.0.1:${port}/addToCart`,
+            form: goodsInfo,
         }
-    })
+        // 发送商品信息给子进程
+        ajax.post(options, (err, res, body) => {})
+    }
 }
 
-// 开始循环加入购物车
-const addToCart = function (goodsInfo) {
-    let loopTime = parseInt(1000 / goodsInfo.frequency)
-    let url = 'https://www.epet.com/share/ajax.html'
-    berserkTimer =  setInterval(function () {
-        addGoodsTocart(goodsInfo, url)
-    }, loopTime)
-    // 过抢购时间后关闭加购物车请求
-    let time = (Number(goodsInfo.speedinessTime) * 1000) + 100
-    setTimeout(() => {
-        clearInterval(berserkTimer)
-        let body = {
-            result: buyingResult.get(),
-            num: buyingNum.get(),
-        }
-        let options = {
-            url: 'http://127.0.0.1/sendResult',
-            form: body,
-        }
-        // 发送抢购结果给 master
-        ajax.post(options, (err, res, body) => {})
-    }, time)
-}
+const workers = []
 
 const __main = () => {
+    //创建 4 个子进程
+    // for (let i = 0; i < 4; i++) {
+    //     var port = 8080 + i
+    //     let workerProcess = childProcess.exec(`node app.js ${port}`, function(error, stdout, stderr) {
+    //         if (error) {
+    //             console.log(error.stack)
+    //             console.log('Error code: ' + error.code)
+    //             console.log('Signal received: ' + error.signal)
+    //         }
+    //         console.log('子进程输出', stdout);
+    //     })
+    //     workerProcess.on('exit', function(code) {
+    //         console.log('子进程已退出，退出码 ' + code)
+    //     })
+    // }
+
     // 开启前端服务
     openFeServer()
+    // 创建 4 个子进程
+    for (let i = 0; i < 4; i++) {
+        let port = 8080 + i
+        let workerProcess = childProcess.fork('./app.js', [port])
+        workers.push(workerProcess)
+    }
 }
 
 __main()
